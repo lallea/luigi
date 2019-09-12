@@ -188,3 +188,47 @@ class LocalTarget(FileSystemTarget):
     def __del__(self):
         if self.is_tmp and self.exists():
             self.remove()
+
+
+class LocalFlagTarget(FlagDirMixin, LocalTarget):
+    """Defines a target with a flag file (defaults to _SUCCESS) used to mark the directory dataset
+    as fully populated, e.g. by the completion of a job.
+
+    This checks for two things:
+
+    * the path exists (just like the LocalTarget)
+    * the _SUCCESS file exists within the directory.
+
+    Because Hadoop/Spark outputs into a directory and not a single file,
+    the path is assumed to be a directory, and should end with a slash.
+    """
+
+    def __init__(self, path, format=None, flag='_SUCCESS'):
+        """
+        Initializes a LocalFlagTarget.
+
+        :param path: the directory where the files are stored.
+        :type path: str
+        :param flag: Name of flag file
+        :type flag: str
+        """
+        if format is None:
+            format = luigi.format.get_default_format()
+
+        uri_prefix = 'file://'
+        if path.startswith(uri_prefix):
+            path = path[len(uri_prefix):]
+        if path[-1] != "/":
+            raise ValueError("LocalFlagTarget requires the path to be to a "
+                             "directory.  It must end with a slash ( / ).")
+        super(LocalFlagTarget, self).__init__(path, format=format)
+        self.flag = flag
+
+    def file_target(self, name):
+        return LocalTarget(os.path.join(self.path, name))
+
+    def exists(self):
+        return self.flag_file_target().exists()
+
+    def __str__(self):
+        return f'LocalFlagTarget({self.path}, {self.flag})'

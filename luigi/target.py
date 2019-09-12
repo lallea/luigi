@@ -347,3 +347,92 @@ class AtomicLocalFile(io.BufferedWriter):
         if exc_type:
             return
         return super(AtomicLocalFile, self).__exit__(exc_type, exc, traceback)
+
+
+# Helper constructs for flag filesystem targets - targets that store data in multiple files in a directory, and use
+# a flag file to signal to consumers that all data has been written.
+
+class FlagDirWrapperBase:
+    def __init__(self, flag_target: FileSystemTarget, mode: str):
+        self.flag_target = flag_target
+        self.mode = mode
+
+    @property
+    @abstractmethod
+    def _format_io_attribute(self):
+        raise NotImplementedError()
+
+    def _open_mode(self):
+        if is_format_binary(self.flag_target.format, self._format_io_attribute) and 'b' not in self.mode:
+            return self.mode + 'b'
+        return self.mode
+
+
+class FlagDirReadWrapper(FlagDirWrapperBase):
+    _format_io_attribute = 'input'
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def __iter__(self):
+        for file_path in self.flag_target.fs.listdir(self.flag_target.path):
+            if file_path.startswith(self.flag_target.path):
+                # listdir is supposed to return relative path, but does not for all target types
+                file_base = file_path[len(self.flag_target.path):]
+            else:
+                file_base = file_path
+            # Ignore _SUCCESS, .*.crc, and other Hadoop/Spark admin files.
+            if file_base[0] not in ('_', '.'):
+                file_target = dir_file_target(self.flag_target, file_base)
+                with file_target.open(mode=self._open_mode()) as f:
+                    for item in f:
+                        yield item
+
+    def read(self, size=-1):
+        if size == -1:
+            return self
+        else:
+            return itertools.islice(self, size)
+
+
+class FlagDirWriteWrapper(FlagDirWrapperBase):
+    _format_io_attribute = 'output'
+
+    def __init__(self, flag_target: FileSystemTarget, mode: str):
+        super(FlagDirWriteWrapper, self).__init__(flag_target, mode)
+        self.data_file = None
+
+    def __enter__(self):
+        extension = self.flag_target.format.extension
+        data_target = self.flag_target.file_target(f'part-00000{extension}')
+        self.data_file = data_target.open(mode=self._open_mode())
+        return self.data_file
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.data_file.close()
+        self.flag_target.touch_flag()
+
+
+class FlagDirMixin:
+    def __init__(self, path, **kwargs):
+        super(FlagDirMixin, self).__init__(path, **kwargs)
+
+    def open(self: FileSystemTarget, mode='r'):
+        rwmode = mode.replace('b', '').replace('t', '')
+        if rwmode == 'w':
+            # noinspection PyTypeChecker
+            return FlagDirWriteWrapper(self, mode)
+        elif rwmode == 'r':
+            return FlagDirReadWrapper(self, mode)
+        else:
+            raise Exception(f"mode must be 'r' or 'w' (got: {mode})")
+
+    def flag_file_target(self):
+        return self.file_target(self.flag)
+
+    def touch_flag(self):
+        with self.flag_file_target().open('w'):
+            pass
