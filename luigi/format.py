@@ -345,6 +345,8 @@ class Format(object):
     Interface for format specifications.
     """
 
+    extension = ''
+
     @classmethod
     def pipe_reader(cls, input_pipe):
         raise NotImplementedError()
@@ -385,6 +387,10 @@ class ChainFormat(Format):
                     )
             except AttributeError:
                 pass
+
+    @property
+    def extension(self):
+        return ''.join([child.extension for child in self.args])
 
     def pipe_reader(self, input_pipe):
         for x in reversed(self.args):
@@ -478,6 +484,7 @@ class GzipFormat(Format):
 
     input = 'bytes'
     output = 'bytes'
+    extension = '.gz'
 
     def __init__(self, compression_level=None):
         self.compression_level = compression_level
@@ -496,6 +503,7 @@ class Bzip2Format(Format):
 
     input = 'bytes'
     output = 'bytes'
+    extension = '.bz2'
 
     def pipe_reader(self, input_pipe):
         return InputPipeProcessWrapper(['bzcat'], input_pipe)
