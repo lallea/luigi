@@ -174,3 +174,8 @@ class BasicsTest(LuigiTestCase):
         ChildTask = self._setup_requires_inheritence()
         self.assertNotEqual(str(ChildTask.__mro__[0]),
                             str(ChildTask.__mro__[1]))
+
+
+class CopyFlagTargetTest(LuigiTestCase):
+    # TODO: Add LocalFlagTarget first
+    pass

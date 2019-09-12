@@ -231,6 +231,35 @@ if six.PY3:
 logger = logging.getLogger('luigi-interface')
 
 
+class CopyFlagTarget(Task):
+    """Copy a *FlagTarget dataset from one location to another.
+
+    Ensure that the flag file is copied last. It guarantees consistent consumption on file systems
+    that provide total store order consistency. HDFS, GCS, NFS, Azure Data Lake do so, but S3, Azure Storage do not.
+    """
+
+    def run(self):
+        self._validate_edge('input', self.input())
+        self._validate_edge('output', self.output())
+        fs = self.output().fs
+        for src_file in fs.listdir(self.input().path):
+            src_base = src_file.rsplit('/', 1)[-1]
+            # Must copy flag file last for consistency.
+            if src_base not in (self.input().flag, self.output().flag):
+                self._copy(fs, src_file, self.output().path + src_base)
+        src_flag = self.input().path + self.input().flag
+        dst_flag = self.output().path + self.output().flag
+        self._copy(fs, src_flag, dst_flag)
+
+    def _validate_edge(self, kind, edge):
+        if not isinstance(edge, FileSystemTarget) or not hasattr(edge, 'flag'):
+            raise ValueError(f'CopyFlagDatasetTask expects a single *FlagTarget as {kind}, got {edge}')
+
+    def _copy(self, fs, src, dst):
+        logging.debug(f'Copying {src} to {dst}')
+        fs.copy(src, dst)
+
+
 def common_params(task_instance, task_cls):
     """
     Grab all the values in task_instance that are found in task_cls.
