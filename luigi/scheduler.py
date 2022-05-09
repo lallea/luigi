@@ -145,6 +145,7 @@ class scheduler(Config):
     send_messages = parameter.BoolParameter(default=True)
 
     metrics_collector = parameter.EnumParameter(enum=MetricsCollectors, default=MetricsCollectors.default)
+    metrics_custom_import = parameter.OptionalStrParameter(default=None)
 
     stable_done_cooldown_secs = parameter.IntParameter(default=10,
                                                        description="Sets cooldown period to avoid running the same task twice")
@@ -695,7 +696,7 @@ class Scheduler:
         if self._config.batch_emails:
             self._email_batcher = BatchNotifier()
 
-        self._state._metrics_collector = MetricsCollectors.get(self._config.metrics_collector)
+        self._state._metrics_collector = MetricsCollectors.get(self._config.metrics_collector, self._config.metrics_custom_import)
 
     def load(self):
         self._state.load()
@@ -1441,7 +1442,7 @@ class Scheduler:
             terms = search.split()
 
             def filter_func(t):
-                return all(term in t.pretty_id for term in terms)
+                return all(term.casefold() in t.pretty_id.casefold() for term in terms)
 
         tasks = self._state.get_active_tasks_by_status(status) if status else self._state.get_active_tasks()
         for task in filter(filter_func, tasks):

@@ -168,24 +168,6 @@ log_level
 logging_conf_file
   Location of the logging configuration file.
 
-max_shown_tasks
-  .. versionadded:: 1.0.20
-
-  The maximum number of tasks returned in a task_list api call. This
-  will restrict the number of tasks shown in task lists in the
-  visualiser. Small values can alleviate frozen browsers when there are
-  too many done tasks. This defaults to 100000 (one hundred thousand).
-
-max_graph_nodes
-  .. versionadded:: 2.0.0
-
-  The maximum number of nodes returned by a dep_graph or
-  inverse_dep_graph api call. Small values can greatly speed up graph
-  display in the visualiser by limiting the number of nodes shown. Some
-  of the nodes that are not sent to the visualiser will still show up as
-  dependencies of nodes that were sent. These nodes are given TRUNCATED
-  status.
-
 no_configure_logging
   If true, logging is not configured. Defaults to false.
 
@@ -303,14 +285,14 @@ wait_interval
   available jobs.
 
 wait_jitter
-  Size of jitter to add to the worker wait interval such that the multiple
-  workers do not ask the scheduler for another job at the same time.
+  Duration of jitter to add to the worker wait interval such that the multiple
+  workers do not ask the scheduler for another job at the same time, in seconds.
   Default: 5.0
 
 max_keep_alive_idle_duration
   .. versionadded:: 2.8.4
 
-  Maximum duration to keep worker alive while in idle state.
+  Maximum duration in seconds to keep worker alive while in idle state.
   Default: 0 (Indefinitely)
 
 max_reschedules
@@ -447,7 +429,7 @@ traceback_max_length
 Parameters controlling the contents of batch notifications sent from the
 scheduler
 
-email_interval
+email_interval_minutes
   Number of minutes between e-mail sends. Making this larger results in
   fewer, bigger e-mails.
   Defaults to 60.
@@ -789,6 +771,24 @@ disable_window
   scheduler forgets about disables that have occurred longer ago than
   this amount of time. Defaults to 3600 (1 hour).
 
+max_shown_tasks
+  .. versionadded:: 1.0.20
+
+  The maximum number of tasks returned in a task_list api call. This
+  will restrict the number of tasks shown in task lists in the
+  visualiser. Small values can alleviate frozen browsers when there are
+  too many done tasks. This defaults to 100000 (one hundred thousand).
+
+max_graph_nodes
+  .. versionadded:: 2.0.0
+
+  The maximum number of nodes returned by a dep_graph or
+  inverse_dep_graph api call. Small values can greatly speed up graph
+  display in the visualiser by limiting the number of nodes shown. Some
+  of the nodes that are not sent to the visualiser will still show up as
+  dependencies of nodes that were sent. These nodes are given TRUNCATED
+  status.
+
 record_task_history
   If true, stores task history in a database. Defaults to false.
 
@@ -836,7 +836,12 @@ metrics_collector
   Optional setting allowing Luigi to use a contribution to collect metrics
   about the pipeline to a third-party. By default this uses the default metric
   collector that acts as a shell and does nothing. The currently available
-  options are "datadog" and "prometheus".
+  options are "datadog", "prometheus" and "custom". If it's custom the
+  'metrics_custom_import' needs to be set.
+
+metrics_custom_import
+  Optional setting allowing Luigi to import a custom subclass of MetricsCollector
+  at runtime. The string should be formatted like "module.sub_module.ClassName".
 
 
 [sendgrid]
