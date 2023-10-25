@@ -269,7 +269,7 @@ Graph = (function() {
             $(svgLink(node.trackingUrl))
                 .append(
                     $(svgElement("text"))
-                    .text(node.name)
+                    .text(escapeHtml(node.name))
                     .attr("y", 3))
                 .attr("class","graph-node-a")
                 .attr("data-task-status", node.status)
@@ -277,7 +277,7 @@ Graph = (function() {
                 .appendTo(g);
 
             var titleText = node.name;
-            var content = $.map(node.params, function (value, name) { return name + ": " + value; }).join("<br>");
+            var content = $.map(node.params, function (value, name) { return escapeHtml(name + ": " + value); }).join("<br>");
             g.attr("title", titleText)
                 .popover({
                     trigger: 'hover',
@@ -313,7 +313,7 @@ Graph = (function() {
                 .appendTo(legend);
 
             $(svgElement("text"))
-                .text(key.charAt(0).toUpperCase() + key.substring(1).toLowerCase().replace(/_./gi, function (x) { return " " + x[1].toUpperCase(); }))
+                .text(escapeHtml(key.charAt(0).toUpperCase() + key.substring(1).toLowerCase().replace(/_./gi, function (x) { return " " + x[1].toUpperCase(); })))
                 .attr("x", legendLineHeight + 14)
                 .attr("y", legendLineHeight+(x*legendLineHeight))
                 .appendTo(legend);

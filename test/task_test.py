@@ -218,6 +218,114 @@ class TaskTest(unittest.TestCase):
                     f"the task '{task_name}'."
                 )
 
+    @with_config(
+        {
+            "TaskEdgeCase": {
+                "camelParam": "camelCase",
+                "underscore_param": "underscore",
+                "dash-param": "dash",
+            },
+        }
+    )
+    def test_unconsumed_params_edge_cases(self):
+        class TaskEdgeCase(luigi.Task):
+            camelParam = luigi.Parameter()
+            underscore_param = luigi.Parameter()
+            dash_param = luigi.Parameter()
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.filterwarnings(
+                action="ignore",
+                category=Warning,
+            )
+            warnings.simplefilter(
+                action="always",
+                category=luigi.parameter.UnconsumedParameterWarning,
+            )
+
+            task = TaskEdgeCase()
+            assert len(w) == 0
+            assert task.camelParam == "camelCase"
+            assert task.underscore_param == "underscore"
+            assert task.dash_param == "dash"
+
+    @with_config(
+        {
+            "TaskIgnoreUnconsumed": {
+                "a": "a",
+                "b": "b",
+                "c": "c",
+            },
+        }
+    )
+    def test_unconsumed_params_ignore_unconsumed(self):
+        class TaskIgnoreUnconsumed(luigi.Task):
+            ignore_unconsumed = {"b", "d"}
+
+            a = luigi.Parameter()
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.filterwarnings(
+                action="ignore",
+                category=Warning,
+            )
+            warnings.simplefilter(
+                action="always",
+                category=luigi.parameter.UnconsumedParameterWarning,
+            )
+
+            TaskIgnoreUnconsumed()
+            assert len(w) == 1
+
+
+class TaskFlattenOutputTest(unittest.TestCase):
+    def test_single_task(self):
+        expected = [luigi.LocalTarget("f1.txt"), luigi.LocalTarget("f2.txt")]
+
+        class TestTask(luigi.ExternalTask):
+            def output(self):
+                return expected
+
+        self.assertListEqual(luigi.task.flatten_output(TestTask()), expected)
+
+    def test_wrapper_task(self):
+        expected = [luigi.LocalTarget("f1.txt"), luigi.LocalTarget("f2.txt")]
+
+        class Test1Task(luigi.ExternalTask):
+            def output(self):
+                return expected[0]
+
+        class Test2Task(luigi.ExternalTask):
+            def output(self):
+                return expected[1]
+
+        @luigi.util.requires(Test1Task, Test2Task)
+        class TestWrapperTask(luigi.WrapperTask):
+            pass
+
+        self.assertListEqual(luigi.task.flatten_output(TestWrapperTask()), expected)
+
+    def test_wrapper_tasks_diamond(self):
+        expected = [luigi.LocalTarget("file.txt")]
+
+        class TestTask(luigi.ExternalTask):
+            def output(self):
+                return expected
+
+        @luigi.util.requires(TestTask)
+        class LeftWrapperTask(luigi.WrapperTask):
+            pass
+
+        @luigi.util.requires(TestTask)
+        class RightWrapperTask(luigi.WrapperTask):
+            pass
+
+        @luigi.util.requires(LeftWrapperTask, RightWrapperTask)
+        class MasterWrapperTask(luigi.WrapperTask):
+            pass
+
+        self.assertListEqual(luigi.task.flatten_output(MasterWrapperTask()), expected)
+
 
 class ExternalizeTaskTest(LuigiTestCase):
 
